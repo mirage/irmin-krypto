@@ -27,123 +27,118 @@ module type CIPHER = sig
 end
 
 module type KEYS = sig
-  type t
-  val data: t
-  val header: t
+  val data: Cstruct.t
+  val header: Cstruct.t
 end
 
-module CTR (K:Irmin.Hash.S) (KS: KEYS with type t = K.t) (C:CTR) = struct
+module CTR (K:Irmin.Hash.S) (Secret: KEYS) (C:CTR) = struct
 
-    type header = Cstruct.t
+  let key_data = C.of_secret Secret.data
+  let key_header = C.of_secret Secret.header
+  let header_length = K.digest_size
 
-    let key_data = C.of_secret (K.to_raw KS.data)
-    let key_header = C.of_secret (K.to_raw KS.header)
-    let header_length = K.digest_size
-
-    let compute_header v =
-      let tmp = K.to_raw (K.digest v) in
-      let res = Cstruct.create header_length in
-      Cstruct.blit tmp 0 res 0 header_length;
-      res
-
-    let extract_header blob =
-      let res = Cstruct.create header_length in
-      Cstruct.blit blob 0 res 0 header_length;
-      res
-
-    let inject_header ~header blob =
-      let len_blob = Cstruct.len blob in
-      let res = Cstruct.create (header_length + len_blob) in
-      Cstruct.blit header 0 res 0 header_length;
-      Cstruct.blit blob 0 res header_length len_blob;
-      res
-
-    let extract_value blob =
-      let len_blob = Cstruct.len blob in
-      let len = len_blob - header_length in
-      let res = Cstruct.create len in
-      Cstruct.blit blob header_length res 0 len;
-      res
-
-    let encrypt value =
-       let ctr_data   = compute_header value in
-       let enc_data   = C.encrypt ~key:key_data ~ctr:ctr_data value in
-       let ctr_header =
-         Cstruct.sub (K.to_raw (K.digest enc_data)) 0 header_length
-       in
-       let enc_header = C.encrypt ~key:key_header ~ctr:ctr_header ctr_data in
-       inject_header ~header:enc_header enc_data
-
-    let decrypt cstr =
-      let enc_header = extract_header cstr in
-      let enc_value  = extract_value cstr in
-      let ctr_header =
-        Cstruct.sub (K.to_raw (K.digest enc_value)) 0 header_length
-      in
-      let dec_header = C.decrypt ~key:key_header ~ctr:ctr_header enc_header in
-      let dec_value  =  C.decrypt ~key:key_data ~ctr:dec_header enc_value in
-      let hash_value = K.to_raw (K.digest dec_value) in
-      let hash_value = Cstruct.sub hash_value 0 header_length in
-      match Cstruct.compare dec_header hash_value with
-      | 0 -> dec_value
-      | _ -> failwith "Data corruption !"
-
-end
-
-
-module GCM (K:Irmin.Hash.S) (KS: KEYS with type t = K.t) (C: CTR) = struct
-
-    type header = {ctr:Cstruct.t; tag:Cstruct.t}
-
-    let key_data = C.of_secret (K.to_raw KS.data)
-    let key_header = C.of_secret (K.to_raw KS.header)
-    let header_length = K.digest_size
-
-    let compute_header v =
+  let compute_header v =
     let tmp = K.to_raw (K.digest v) in
     let res = Cstruct.create header_length in
     Cstruct.blit tmp 0 res 0 header_length;
     res
 
-    let extract_header blob =
-      let res = Cstruct.create header_length in
-      Cstruct.blit blob 0 res 0 header_length;
-      res
+  let extract_header blob =
+    let res = Cstruct.create header_length in
+    Cstruct.blit blob 0 res 0 header_length;
+    res
 
-    let inject_header ~header blob =
-      let len_blob = Cstruct.len blob in
-      let res = Cstruct.create (header_length + len_blob) in
-      Cstruct.blit header 0 res 0 header_length;
-      Cstruct.blit blob 0 res header_length len_blob;
-      res
+  let inject_header ~header blob =
+    let len_blob = Cstruct.len blob in
+    let res = Cstruct.create (header_length + len_blob) in
+    Cstruct.blit header 0 res 0 header_length;
+    Cstruct.blit blob 0 res header_length len_blob;
+    res
 
-    let extract_value blob =
-      let len_blob = Cstruct.len blob in
-      let len = len_blob - header_length in
-      let res = Cstruct.create len in
-      Cstruct.blit blob header_length res 0 len;
-      res
+  let extract_value blob =
+    let len_blob = Cstruct.len blob in
+    let len = len_blob - header_length in
+    let res = Cstruct.create len in
+    Cstruct.blit blob header_length res 0 len;
+    res
 
-    (** Encryption function *)
-    let encrypt value =
-       let ctr_data   = compute_header value in
-       let enc_data   = C.encrypt ~key:key_data ~ctr:ctr_data value in
-       let ctr_header = Cstruct.sub enc_data 0 header_length in
-       let enc_header = C.encrypt ~key:key_header ~ctr:ctr_header ctr_data in
-       inject_header ~header:enc_header enc_data
+  let encrypt value =
+    let ctr_data   = compute_header value in
+    let enc_data   = C.encrypt ~key:key_data ~ctr:ctr_data value in
+    let ctr_header =
+      Cstruct.sub (K.to_raw (K.digest enc_data)) 0 header_length
+    in
+    let enc_header = C.encrypt ~key:key_header ~ctr:ctr_header ctr_data in
+    inject_header ~header:enc_header enc_data
 
-    (** Decryption function *)
-    let decrypt cstr =
-      let enc_header = extract_header cstr in
-      let ctr_header = Cstruct.sub cstr header_length header_length in
-      let dec_header = C.decrypt ~key:key_header ~ctr:ctr_header enc_header in
-      let enc_value  = extract_value cstr in
-      let dec_value  =  C.decrypt ~key:key_data ~ctr:dec_header enc_value in
-      let hash_value = K.to_raw (K.digest dec_value) in
-      let hash_value = Cstruct.sub hash_value 0 header_length in
-      match Cstruct.compare dec_header hash_value with
-      | 0 -> dec_value
-      | _ -> failwith "Data corruption !"
+  let decrypt cstr =
+    let enc_header = extract_header cstr in
+    let enc_value  = extract_value cstr in
+    let ctr_header =
+      Cstruct.sub (K.to_raw (K.digest enc_value)) 0 header_length
+    in
+    let dec_header = C.decrypt ~key:key_header ~ctr:ctr_header enc_header in
+    let dec_value  =  C.decrypt ~key:key_data ~ctr:dec_header enc_value in
+    let hash_value = K.to_raw (K.digest dec_value) in
+    let hash_value = Cstruct.sub hash_value 0 header_length in
+    match Cstruct.compare dec_header hash_value with
+    | 0 -> dec_value
+    | _ -> failwith "Data corruption !"
+
+end
+
+
+module GCM (K:Irmin.Hash.S) (Secret: KEYS) (C: CTR) = struct
+
+  type header = {ctr:Cstruct.t; tag:Cstruct.t}
+
+  let key_data = C.of_secret Secret.data
+  let key_header = C.of_secret Secret.header
+  let header_length = K.digest_size
+
+  let compute_header v =
+    let tmp = K.to_raw (K.digest v) in
+    let res = Cstruct.create header_length in
+    Cstruct.blit tmp 0 res 0 header_length;
+    res
+
+  let extract_header blob =
+    let res = Cstruct.create header_length in
+    Cstruct.blit blob 0 res 0 header_length;
+    res
+
+  let inject_header ~header blob =
+    let len_blob = Cstruct.len blob in
+    let res = Cstruct.create (header_length + len_blob) in
+    Cstruct.blit header 0 res 0 header_length;
+    Cstruct.blit blob 0 res header_length len_blob;
+    res
+
+  let extract_value blob =
+    let len_blob = Cstruct.len blob in
+    let len = len_blob - header_length in
+    let res = Cstruct.create len in
+    Cstruct.blit blob header_length res 0 len;
+    res
+
+  let encrypt value =
+    let ctr_data   = compute_header value in
+    let enc_data   = C.encrypt ~key:key_data ~ctr:ctr_data value in
+    let ctr_header = Cstruct.sub enc_data 0 header_length in
+    let enc_header = C.encrypt ~key:key_header ~ctr:ctr_header ctr_data in
+    inject_header ~header:enc_header enc_data
+
+  let decrypt cstr =
+    let enc_header = extract_header cstr in
+    let ctr_header = Cstruct.sub cstr header_length header_length in
+    let dec_header = C.decrypt ~key:key_header ~ctr:ctr_header enc_header in
+    let enc_value  = extract_value cstr in
+    let dec_value  =  C.decrypt ~key:key_data ~ctr:dec_header enc_value in
+    let hash_value = K.to_raw (K.digest dec_value) in
+    let hash_value = Cstruct.sub hash_value 0 header_length in
+    match Cstruct.compare dec_header hash_value with
+    | 0 -> dec_value
+    | _ -> failwith "Data corruption !"
 
 end
 

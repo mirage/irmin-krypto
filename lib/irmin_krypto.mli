@@ -25,12 +25,8 @@ end
 module AO (C: CIPHER) (S:Irmin.AO_MAKER_RAW): Irmin.AO_MAKER_RAW
 
 module type KEYS = sig
-  type t
-  val data: t
-  val header: t
+  val data: Cstruct.t
+  val header: Cstruct.t
 end
 
-module CTR
-    (K: Irmin.Hash.S) (KS: KEYS with type t = K.t)
-    (C:Nocrypto.Cipher_block.S.CTR):
-  CIPHER
+module CTR (K: Irmin.Hash.S) (S: KEYS) (C:Nocrypto.Cipher_block.S.CTR): CIPHER
