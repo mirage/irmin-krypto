@@ -20,3 +20,16 @@ Document "irmin-krypto"
   Install:              true
   XOCamlbuildPath:      lib/
   XOCamlbuildLibraries: irmin-krypto
+
+Executable test
+  Path:           lib_test
+  MainIs:         test.ml
+  Build$:         flag(tests)
+  CompiledObject: best
+  Install:        false
+  BuildDepends:   irmin, irmin.mem, irmin-krypto, alcotest, lwt.unix
+
+Test test_crypto
+  Run$:             flag(tests)
+  Command:          $test -q
+  WorkingDirectory: lib_test
