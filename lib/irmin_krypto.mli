@@ -29,4 +29,6 @@ module type KEYS = sig
   val header: Cstruct.t
 end
 
+(* FIXME: what's the difference between the 2? *)
 module CTR (K: Irmin.Hash.S) (S: KEYS) (C:Nocrypto.Cipher_block.S.CTR): CIPHER
+module GCM (K: Irmin.Hash.S) (S: KEYS) (C:Nocrypto.Cipher_block.S.CTR): CIPHER

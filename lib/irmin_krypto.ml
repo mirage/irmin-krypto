@@ -90,8 +90,6 @@ end
 
 module GCM (K:Irmin.Hash.S) (Secret: KEYS) (C: CTR) = struct
 
-  type header = {ctr:Cstruct.t; tag:Cstruct.t}
-
   let key_data = C.of_secret Secret.data
   let key_header = C.of_secret Secret.header
   let header_length = K.digest_size
