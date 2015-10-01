@@ -1,0 +1,22 @@
+OASISFormat: 0.4
+Name:        irmin-krypto
+Version:     1.0.0
+Synopsis:    An encryption backend for Irmin
+Authors:     Mounir Nasr Allah, Thomas Gazagnaire
+License:     ISC
+Plugins:     META (0.4), DevFiles (0.4)
+BuildTools:  ocamlbuild
+
+Library "irmin-krypto"
+  Path:             lib
+  Findlibname:      irmin-krypto
+  BuildDepends:     irmin, nocrypto
+  Modules:          Irmin_krypto
+
+Document "irmin-krypto"
+  Title:                Irmin Krypto-backend docs
+  Type:                 OCamlbuild (0.4)
+  BuildTools+:          ocamldoc
+  Install:              true
+  XOCamlbuildPath:      lib/
+  XOCamlbuildLibraries: irmin-krypto
