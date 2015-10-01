@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: e5c0720ef7ca7589db9ad52f74af4706)
+version = "1.0.0"
+description = "An encryption backend for Irmin"
+requires = "irmin nocrypto"
+archive(byte) = "irmin-krypto.cma"
+archive(byte, plugin) = "irmin-krypto.cma"
+archive(native) = "irmin-krypto.cmxa"
+archive(native, plugin) = "irmin-krypto.cmxs"
+exists_if = "irmin-krypto.cma"
+# OASIS_STOP
+
